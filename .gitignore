@@ -100,5 +100,10 @@ venv.bak/
 # mkdocs documentation
 /site
 
+*.pth
+*.tar
+*.out
+/runs
+.ipynb_checkpoints
 # mypy
 .mypy_cache/
