@@ -27,10 +27,11 @@ from tensorboardX import SummaryWriter
 DATA_DIR = "/home/krf/dataset/BALL/"
 traindir = DATA_DIR + "train"
 valdir = DATA_DIR +"val"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 BATCH_SIZE = 2
 WORKERS = 4
-EPOCHS = 40
+START = 20
+EPOCHS = 80
 PRINT_FREQ = 10
 
 
@@ -271,6 +272,33 @@ def accuracy(output, target, topk=(1,)):
 
 # In[ ]:
 
+# 加载模型，解决命名和维度不匹配问题,解决多个gpu并行
+def load_state_keywise(model, model_path):
+    model_dict = model.state_dict()
+    
+    print("=> loading checkpoint '{}'".format(model_path))
+    checkpoint = torch.load(model_path,map_location='cpu')
+    START = checkpoint['epoch']
+    best_F1 = checkpoint['best_prec1']
+    #model.load_state_dict(checkpoint['state_dict'])
+    
+    pretrained_dict = checkpoint['state_dict']#torch.load(model_path, map_location='cpu')
+    key = list(pretrained_dict.keys())[0]
+    # 1. filter out unnecessary keys
+    # 1.1 multi-GPU ->CPU
+    if (str(key).startswith('module.')):
+        pretrained_dict = {k[7:]: v for k, v in pretrained_dict.items() if
+                           k[7:] in model_dict and v.size() == model_dict[k[7:]].size()}
+    else:
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if
+                           k in model_dict and v.size() == model_dict[k].size()}
+    # 2. overwrite entries in the existing state dict
+    model_dict.update(pretrained_dict)
+    # 3. load the new state dict
+    model.load_state_dict(model_dict)
+    return START,best_F1
+
+
 
 criterion = nn.CrossEntropyLoss().cuda()
 
@@ -278,14 +306,16 @@ optimizer = torch.optim.Adam(model.parameters(), lr = 1e-5)
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True)
 
+START,best_f1 = load_state_keywise(model,'checkpoint.pth.tar')
 #model = model.cuda()
 model = torch.nn.DataParallel(model).cuda()
+
 # TP = 0,TN = 0,FN = 0, FP = 0
 writer = SummaryWriter()
-best_f1 = 0
+# best_f1 = 0
 trainMeter = ModelMeter()
 valMeter = ModelMeter()
-for epoch in range(EPOCHS):
+for epoch in range(START,EPOCHS):
     # train for one epoch
     train(train_loader, model, criterion, optimizer, epoch, scheduler)
     # evaluate on validation set
