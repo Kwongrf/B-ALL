@@ -1,8 +1,10 @@
+# %load train.py
 #!/usr/bin/env python
-# coding: utf-8
 
 # In[1]:
+from t_cnn import tcnn
 
+model = tcnn(num_classes = 2,pretrained = True, model_root = '/home/krf/model/BALL/')
 
 import senet
 import os
@@ -27,23 +29,23 @@ from tensorboardX import SummaryWriter
 DATA_DIR = "/home/krf/dataset/BALL/"
 traindir = DATA_DIR + "train"
 valdir = DATA_DIR +"val"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 BATCH_SIZE = 32
 WORKERS = 4
 START = 0
-EPOCHS = 700
-PRINT_FREQ = 10
+EPOCHS = 1200
+PRINT_FREQ = 20
 
 
 # In[31]:
 
 
-model =  senet.se_resnext50_32x4d(num_classes = 2)
+#model =  senet.se_resnext50_32x4d(num_classes = 2)
 #通过随机变化来进行数据增强
 train_tf  = TransformImage(
     model,
     
-    random_crop=True,
+    random_crop=False,
     random_hflip=True,
     random_vflip=True,
     random_rotate=True,
@@ -81,39 +83,16 @@ def train(train_loader, model, criterion, optimizer, epoch,scheduler):
     for i, (input, target) in enumerate(train_loader):
         # measure data loading time
 #         data_time.update(time.time() - end)
-
+        input = input.cuda()
         target = target.cuda(async=True)
         input_var = torch.autograd.Variable(input.float())
         target_var = torch.autograd.Variable(target)
-
+        #print(input_var.type())
         # compute output
         output = model(input_var)
         loss = criterion(output, target_var)
         #print(output.data)
-        # TP    predict 和 label 同时为1
-#         _, pred = output.topk(1, 1, True, True)
-#         pred = pred.t()
-#         print(pred,target.data)
-#         #correct = pred.eq(target.view(1, -1).expand_as(pred))
-#         TP += ((pred == 1) & (target.data == 1)).cpu().numpy().sum()
-#         # TN    predict 和 label 同时为0
-#         TN += ((pred == 0) & (target.data == 0)).cpu().numpy().sum()
-#         # FN    predict 0 label 1
-#         FN += ((pred == 0) & (target.data == 1)).cpu().numpy().sum()
-#         # FP    predict 1 label 0
-#         FP += ((pred == 1) & (target.data == 0)).cpu().numpy().sum()
-#         print(TP,FP,TN,FN)
-        
-#         P = TP / (TP + FP)
-#         #print(P)
-#         R = TP / (TP + FN)
-#         F1 = 2 * R * P / (R + P)
-#         Acc = (TP + TN) / (TP + TN + FP + FN)
-        #print(F1)               
-#         # measure accuracy and record loss
-#         prec1= accuracy(output.data, target)
-#         losses.update(loss.data[0], input.size(0))
-#         top1.update(prec1[0], input.size(0))
+
 
 
 #         # compute gradient and do SGD step
@@ -137,7 +116,7 @@ def train(train_loader, model, criterion, optimizer, epoch,scheduler):
                    Acc=meters[3],P=meters[0],R=meters[1],F1=meters[2]))
             
             step = epoch*len(train_loader) + i
-           
+            
             writer.add_scalar('TRAIN/Precision', meters[0], step)
             writer.add_scalar('TRAIN/Recall', meters[1], step)
             writer.add_scalar('TRAIN/F1', meters[2], step)
@@ -187,7 +166,7 @@ def validate(val_loader, model, criterion,epoch):
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(filename, 'tcnn5_model_best.pth.tar')
 
 class ModelMeter(object):
     def __init__(self):
@@ -196,19 +175,19 @@ class ModelMeter(object):
     def reset(self):
         self.losses = AverageMeter()
         self.top1 = AverageMeter()
-        self.TP = 0
-        self.TN = 0
-        self.FN = 0
-        self.FP = 0
-        self.P=0
-        self.R=0
-        self.F1=0
-        self.Acc=0
+        self.TP = 1e-8
+        self.TN = 1e-8
+        self.FN = 1e-8
+        self.FP = 1e-8
+        self.P=1e-8
+        self.R=1e-8
+        self.F1=1e-8
+        self.Acc=1e-8
 
     def update(self, output,target,loss, n=1):
         _, pred = output.data.topk(1, 1, True, True)
         pred = pred.t()
-        #print(pred,target.data)
+#         print(pred,target.data)
         # TP    predict 和 label 同时为1
         self.TP += ((pred == 1) & (target.data == 1)).cpu().numpy().sum()
         # TN    predict 和 label 同时为0
@@ -217,7 +196,24 @@ class ModelMeter(object):
         self.FN += ((pred == 0) & (target.data == 1)).cpu().numpy().sum()
         # FP    predict 1 label 0
         self.FP += ((pred == 1) & (target.data == 0)).cpu().numpy().sum()
-        #print(self.TP,self.TN,self.FN,self.FP)
+#         print(self.TP,self.TN,self.FN,self.FP)
+#         zes=torch.autograd.Variable(torch.zeros(target.size()).type(torch.cuda.LongTensor))#全0变量
+
+#         ons=torch.autograd.Variable(torch.ones(target.size()).type(torch.cuda.LongTensor))#全1变量
+#         print(zes,ons)
+#         train_correct01 = ((pred==zes)&(target.data.squeeze(1)==ons)).sum()#原标签为1，预测为 0 的总数
+
+#         train_correct10 = ((pred==ons)&(target.data.squeeze(1)==zes)).sum()#原标签为0，预测为1  的总数
+
+#         train_correct11 = ((pred_y==ons)&(target.data.squeeze(1)==ons)).sum()
+#         train_correct00 = ((pred_y==zes)&(target.data.squeeze(1)==zes)).sum()
+#         self.FN += train_correct01.data[0]        
+
+#         self.FP += train_correct10.data[0]
+
+#         self.TP += train_correct11.data[0]  
+#         self.TN += train_correct00.data[0]
+      
         self.P = self.TP / (self.TP + self.FP)
         self.R = self.TP / (self.TP + self.FN)
         self.F1 = 2 * self.R * self.P / (self.R + self.P)
@@ -235,9 +231,9 @@ class AverageMeter(object):
         self.reset()
 
     def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
+        self.val = 1e-8
+        self.avg = 1e-8
+        self.sum = 1e-8
         self.count = 0
 
     def update(self, val, n=1):
@@ -247,11 +243,13 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-# def adjust_learning_rate(optimizer, epoch):
-#     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-#     lr = args.lr * (0.1 ** (epoch // 30))
-#     for param_group in optimizer.param_groups:
-#         param_group['lr'] = lr
+def adjust_learning_rate(lr,optimizer, epoch):
+    if epoch >= 300 and epoch % 100 == 0 :
+        lr /= 10
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        print("adjuct learning rate to {}".format(lr))
+    return lr
 
 
 def accuracy(output, target, topk=(1,)):
@@ -296,27 +294,30 @@ def load_state_keywise(model, model_path):
     model_dict.update(pretrained_dict)
     # 3. load the new state dict
     model.load_state_dict(model_dict)
-    return START,best_F1
+    print("start at epoch {}, best_f1={}".format(START,best_F1))
+    return model,START,best_F1
 
 
 
 criterion = nn.CrossEntropyLoss().cuda()
+lr = 1e-4
+optimizer = torch.optim.SGD(model.parameters(), lr = lr,momentum = 0.9,weight_decay=1e-6)
 
-optimizer = torch.optim.Adam(model.parameters(), lr = 1e-5)
-
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True)
-
-START,best_f1 = load_state_keywise(model,'checkpoint.pth.tar')
-#model = model.cuda()
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
+best_f1 = 0
+model,START,best_f1 = load_state_keywise(model,'tcnn5_checkpoint-Copy1.pth.tar')
+# model = model.cuda()
 model = torch.nn.DataParallel(model).cuda()
 
 # TP = 0,TN = 0,FN = 0, FP = 0
 writer = SummaryWriter()
-# best_f1 = 0
+
 trainMeter = ModelMeter()
 valMeter = ModelMeter()
 for epoch in range(START,EPOCHS):
     # train for one epoch
+    lr = optimizer.param_groups[0]['lr']
+    writer.add_scalar('TRAIN/LR', lr, epoch)
     train(train_loader, model, criterion, optimizer, epoch, scheduler)
     # evaluate on validation set
     F1 = validate(val_loader, model, criterion,epoch)
@@ -326,23 +327,14 @@ for epoch in range(START,EPOCHS):
     best_f1 = max(F1, best_f1)
     save_checkpoint({
         'epoch': epoch + 1,
-        'arch': "SE_ResNeXt50",
+        'arch': "T-CNN",
         'state_dict': model.state_dict(),
         'best_prec1': best_f1,
-    }, is_best)
+    }, is_best,filename='tcnn5_checkpoint.pth.tar')
 # export scalar data to JSON for external processing
 writer.export_scalars_to_json("./test.json")
 writer.close()
-    
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
 
 
 

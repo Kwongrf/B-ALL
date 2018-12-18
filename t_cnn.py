@@ -15,7 +15,7 @@ settings =   {  'input_space': 'RGB',
 
 class AlexNet(nn.Module):
 
-    def __init__(self, num_classes=1000):
+    def __init__(self, num_classes):
         super(AlexNet, self).__init__()
         self.num_classes = num_classes
         self.conv1 = nn.Sequential(
@@ -67,8 +67,7 @@ def alexnet(pretrained=False, model_root=None, **kwargs):
 
 class TCNN_Alex(AlexNet):
     def __init__(self,num_classes):
-        super(TCNN_Alex,self).__init__()
-        self.num_classes = num_classes
+        super(TCNN_Alex,self).__init__(num_classes)
     
     def energy_layer(self,x):
         x_size = x.size()
@@ -89,6 +88,9 @@ class TCNN_Alex(AlexNet):
         #print(x.size())
         x = self.conv3(x)
         #print(x.size())
+        x = self.conv4(x)
+        x = self.conv5(x)
+        
         e = self.energy_layer(x)
         #print(e.size())
         
@@ -108,6 +110,7 @@ class TCNN_Alex(AlexNet):
 
 def tcnn(num_classes=1000,pretrained=False, model_root=None,**kwargs):
     model = TCNN_Alex(num_classes,**kwargs)
+    print(model)
     model.input_space = settings['input_space']
     model.input_size = settings['input_size']
     model.input_range = settings['input_range']
